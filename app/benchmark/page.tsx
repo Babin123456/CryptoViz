@@ -303,7 +303,7 @@ function BenchmarkContent() {
             cipherId,
             payloadSizes,
             Math.max(10, Math.floor(iterations / 10)), // Use fewer iterations for scaling to save time
-            runCipher as any,
+            runCipher,
             getBenchmarkParams,
             (current, total, currentSize) => {
               const sizeFormatted = currentSize >= 1024 * 1024

@@ -16,11 +16,12 @@ const executeCipher = useCallback(() => {
     setError(null);
     setDiagnostic(null);
     // setResult(...)
-  } catch (err: any) {
-    setError(err.message || "An error occurred during calculation.");
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : "An error occurred during calculation.";
+    setError(errorMsg);
     
     // Feed the CipherError into your existing diagnostic engine
-    if (err.name === 'CipherError') {
+    if (err instanceof Error && err.name === 'CipherError') {
       const diagnosis = diagnoseError(err, {
         cipherId: currentCipherType,
         // Optional: Map your current state variables here based on the cipher 

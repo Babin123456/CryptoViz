@@ -14,8 +14,8 @@ export interface CryptoWorkerRunOptions {
 }
 
 type Resolvers = {
-  resolve: (value: any) => void
-  reject: (reason?: any) => void
+  resolve: (value: unknown) => void
+  reject: (reason?: unknown) => void
   onProgress?: (percent: number, message: string) => void
   signal?: AbortSignal
   onAbort?: () => void
@@ -29,8 +29,8 @@ class CryptoWorkerClient {
     if (!this.worker && typeof window !== 'undefined') {
       this.worker = new Worker(new URL('./crypto.worker.ts', import.meta.url), { type: 'module' })
       this.worker.onmessage = (event: MessageEvent<CryptoWorkerResponse | CryptoWorkerProgress>) => {
-        const data = event.data as any
-        if (data?.type === 'PROGRESS') {
+        const data = event.data
+        if ('type' in data && data.type === 'PROGRESS') {
           const request = this.pendingRequests.get(data.jobId)
           request?.onProgress?.(
             Math.max(0, Math.min(100, Number(data.percent))),
@@ -38,21 +38,23 @@ class CryptoWorkerClient {
           )
           return
         }
-        const id = data.id
-        const resolvers = this.pendingRequests.get(id)
-        if (!resolvers) return
-        this.pendingRequests.delete(id)
-        if (resolvers.signal && resolvers.onAbort) {
-          resolvers.signal.removeEventListener('abort', resolvers.onAbort)
+        if ('id' in data) {
+          const id = data.id
+          const resolvers = this.pendingRequests.get(id)
+          if (!resolvers) return
+          this.pendingRequests.delete(id)
+          if (resolvers.signal && resolvers.onAbort) {
+            resolvers.signal.removeEventListener('abort', resolvers.onAbort)
+          }
+          if (data.success) resolvers.resolve(data.result)
+          else resolvers.reject(new Error(data.error))
         }
-        if (data.success) resolvers.resolve(data.result)
-        else resolvers.reject(new Error(data.error))
       }
     }
   }
 
   public async runCryptoOperation<T>(
-    operation: CryptoWorkerRequest['operation'],
+    operation: Extract<CryptoWorkerRequest, { operation: string }>['operation'],
     payload: unknown,
     options?: CryptoWorkerRunOptions,
   ): Promise<T> {

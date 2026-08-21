@@ -32,7 +32,17 @@ import {
   ecrecover,
   simulateNonceReuseAttack,
   simulateSignatureMalleability,
+  ECDSASignature,
+  SchnorrSignature,
 } from '@/lib/blockchain/blockchainEngine';
+
+function isECDSASignature(sig: ECDSASignature | SchnorrSignature): sig is ECDSASignature {
+  return 'rHex' in sig;
+}
+
+function isSchnorrSignature(sig: ECDSASignature | SchnorrSignature): sig is SchnorrSignature {
+  return 'rPointHex' in sig;
+}
 
 const ETHEREUM_TX_PRESET: EthereumTxInput = {
   nonce: 12,
@@ -99,8 +109,8 @@ export default function BlockchainExplorer() {
 
   // Malleability result
   const malleabilityResult = useMemo(() => {
-    if (signedTx.scheme.includes('ECDSA')) {
-      return simulateSignatureMalleability(signedTx.signature as any);
+    if (isECDSASignature(signedTx.signature)) {
+      return simulateSignatureMalleability(signedTx.signature);
     }
     return null;
   }, [signedTx]);
@@ -150,18 +160,18 @@ export default function BlockchainExplorer() {
       {/* Navigation Tabs */}
       <div className="flex overflow-x-auto gap-2 border-b border-zinc-200 dark:border-zinc-800 pb-2 scrollbar-hide">
         {[
-          { id: 'builder', label: 'Tx Builder & Signer', icon: Send },
-          { id: 'ecrecover', label: 'ecrecover Key Recovery', icon: Eye },
-          { id: 'math', label: 'secp256k1 & Schnorr Math', icon: Sliders },
-          { id: 'attack', label: 'Nonce Reuse & Attack Lab', icon: Flame },
-          { id: 'theory', label: 'Standards & Security Theory', icon: BookOpen },
+          { id: 'builder' as const, label: 'Tx Builder & Signer', icon: Send },
+          { id: 'ecrecover' as const, label: 'ecrecover Key Recovery', icon: Eye },
+          { id: 'math' as const, label: 'secp256k1 & Schnorr Math', icon: Sliders },
+          { id: 'attack' as const, label: 'Nonce Reuse & Attack Lab', icon: Flame },
+          { id: 'theory' as const, label: 'Standards & Security Theory', icon: BookOpen },
         ].map(tab => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.id;
           return (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
+              onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-2.5 rounded-xl font-semibold text-sm transition-all whitespace-nowrap ${
                 isActive
                   ? 'bg-amber-500 text-zinc-950 font-bold shadow-md shadow-amber-500/20'
@@ -310,20 +320,20 @@ export default function BlockchainExplorer() {
                     <p className="text-amber-500 font-bold mt-1 break-all">{signedTx.txHashHex}</p>
                   </div>
 
-                  {signedTx.scheme.includes('ECDSA') ? (
+                  {isECDSASignature(signedTx.signature) ? (
                     <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
                       <span className="text-amber-500 font-bold uppercase block">2. ECDSA Signature Components (r, s, v)</span>
-                      <p className="text-zinc-300 break-all">r: {(signedTx.signature as any).rHex}</p>
-                      <p className="text-zinc-300 break-all">s: {(signedTx.signature as any).sHex}</p>
-                      <p className="text-zinc-300">v (Recovery ID): {(signedTx.signature as any).v}</p>
+                      <p className="text-zinc-300 break-all">r: {signedTx.signature.rHex}</p>
+                      <p className="text-zinc-300 break-all">s: {signedTx.signature.sHex}</p>
+                      <p className="text-zinc-300">v (Recovery ID): {signedTx.signature.v}</p>
                     </div>
-                  ) : (
+                  ) : isSchnorrSignature(signedTx.signature) ? (
                     <div className="p-3.5 bg-zinc-50 dark:bg-zinc-950 rounded-xl border border-zinc-200 dark:border-zinc-800 space-y-2">
                       <span className="text-amber-500 font-bold uppercase block">2. Schnorr Signature Components (R, s)</span>
-                      <p className="text-zinc-300 break-all">R (Point): {(signedTx.signature as any).rPointHex}</p>
-                      <p className="text-zinc-300 break-all">s (Scalar): {(signedTx.signature as any).sScalarHex}</p>
+                      <p className="text-zinc-300 break-all">R (Point): {signedTx.signature.rPointHex}</p>
+                      <p className="text-zinc-300 break-all">s (Scalar): {signedTx.signature.sScalarHex}</p>
                     </div>
-                  )}
+                  ) : null}
 
                   {signedTx.recoveredAddress && (
                     <div className="p-3.5 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center justify-between">

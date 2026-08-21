@@ -1,4 +1,6 @@
-export interface Rc6Options {
+import type { CipherOptions, CipherResult, CipherStep } from '../types';
+
+export interface Rc6Options extends CipherOptions {
   rounds?: number;
 }
 
@@ -416,7 +418,7 @@ export const TEST_VECTORS = [
   },
 ]
 
-export function encrypt(input: string, key: string, options?: any) {
+export function encrypt(input: string, key: string, options?: Rc6Options): CipherResult {
   if (!input) {
     throw new Error('Input message is required.')
   }
@@ -429,7 +431,7 @@ export function encrypt(input: string, key: string, options?: any) {
   
   const numBlocks = input.length / 32
   let outHex = ''
-  const steps: any[] = []
+  const steps: CipherStep[] = []
   
   for (let b = 0; b < numBlocks; b++) {
     const block = input.slice(b * 32, (b + 1) * 32)
@@ -461,7 +463,7 @@ export function encrypt(input: string, key: string, options?: any) {
   }
 }
 
-export function decrypt(input: string, key: string, options?: any) {
+export function decrypt(input: string, key: string, options?: Rc6Options): CipherResult {
   if (!input) {
     throw new Error('Input message is required.')
   }
@@ -474,6 +476,7 @@ export function decrypt(input: string, key: string, options?: any) {
   
   const numBlocks = input.length / 32
   let outHex = ''
+  const steps: CipherStep[] = []
   
   for (let b = 0; b < numBlocks; b++) {
     const block = input.slice(b * 32, (b + 1) * 32)

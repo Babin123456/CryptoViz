@@ -2,6 +2,11 @@ import { BaseCipher } from './baseCipher';
 
 export type PipelineMode = 'FAST' | 'INSTRUMENTED';
 
+export interface TraceStep {
+  step: string;
+  data: Uint8Array;
+}
+
 export class InstrumentedPipeline {
   private cipher: BaseCipher;
   private mode: PipelineMode;
@@ -11,7 +16,7 @@ export class InstrumentedPipeline {
     this.mode = mode;
   }
 
-  async execute(plaintext: Uint8Array): Promise<{ result: Uint8Array; traces?: any[] }> {
+  async execute(plaintext: Uint8Array): Promise<{ result: Uint8Array; traces?: TraceStep[] }> {
     if (this.mode === 'FAST') {
       const result = await this.cipher.encrypt(plaintext);
       return { result };
@@ -19,7 +24,7 @@ export class InstrumentedPipeline {
 
     // Instrumented mode: capture step-by-step intermediate state metrics
     // In a full implementation, the cipher would emit internal state steps
-    const traces = [
+    const traces: TraceStep[] = [
       { step: 'INIT', data: plaintext },
       { step: 'KEY_ADDITION', data: new Uint8Array(plaintext) }, // Mocked
       { step: 'SUBSTITUTION', data: new Uint8Array(plaintext) },
@@ -28,6 +33,9 @@ export class InstrumentedPipeline {
     const result = await this.cipher.encrypt(plaintext);
     traces.push({ step: 'FINAL', data: result });
     
-    return { result, traces };
+    return {
+      result,
+      traces,
+    };
   }
 }

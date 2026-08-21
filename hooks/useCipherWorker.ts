@@ -1,32 +1,58 @@
-
 'use client'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { CipherResult } from '@/lib/cipher/types'
 import type { WorkerRequest, WorkerResponse } from '@/types/worker'
 import type { WorkerPriority } from '@/lib/workers/pool'
+import type { WorkerProgressMessage } from '@/lib/workers/cipher-worker-protocol'
+import { CipherError } from '@/lib/utils/errors'
 
 const MAX_CACHE_SIZE = 200
+const WORKER_TIMEOUT_MS = 10000
 const resultCache = new Map<string, CipherResult>()
+
 export interface CipherWorkerProgress {
   percent: number
   currentMilestone: string
   jobId: string
 }
+
 export interface RunCipherOptions {
   signal?: AbortSignal
   bypassCache?: boolean
   priority?: WorkerPriority
   onProgress?: (percent: number, message: string) => void
+  [key: string]: unknown
 }
-function sortObjectKeys(obj: any): any {
+
+interface RequestHandlers {
+  resolve: (value: CipherResult) => void
+  reject: (reason: unknown) => void
+  signal?: AbortSignal
+  onAbort?: () => void
+  timeoutId: ReturnType<typeof setTimeout>
+  cacheKey: string | null
+  onProgress?: (percent: number, message: string) => void
+}
+
+function sortObjectKeys(obj: unknown): unknown {
   if (obj === null || typeof obj !== 'object') return obj
   if (Array.isArray(obj)) return obj.map(sortObjectKeys)
-  return Object.fromEntries(Object.keys(obj).sort().map(k => [k, sortObjectKeys(obj[k])]))
+  const record = obj as Record<string, unknown>
+  return Object.fromEntries(Object.keys(record).sort().map(k => [k, sortObjectKeys(record[k])]))
 }
-function getCacheKey(action: 'encrypt' | 'decrypt', cipherId: string, input: string, key: string, options?: RunCipherOptions) {
+
+function getCacheKey(
+  action: 'encrypt' | 'decrypt',
+  cipherId: string,
+  input: string,
+  key: string,
+  options?: RunCipherOptions
+): string {
   const { signal: _, bypassCache: __, onProgress: ___, priority: ____, ...cacheableOptions } = options || {}
   return JSON.stringify({ action, cipherId, input, key, options: sortObjectKeys(cacheableOptions) })
 }
+
 function cacheResult(key: string, result: CipherResult) {
   if (resultCache.has(key)) resultCache.delete(key)
   else if (resultCache.size >= MAX_CACHE_SIZE) {
@@ -35,7 +61,10 @@ function cacheResult(key: string, result: CipherResult) {
   }
   resultCache.set(key, result)
 }
-export function clearCipherWorkerCache() { resultCache.clear() }
+
+export function clearCipherWorkerCache() {
+  resultCache.clear()
+}
 
 export function useCipherWorker() {
   const workerRef = useRef<Worker | null>(null)
@@ -43,128 +72,176 @@ export function useCipherWorker() {
   const [progress, setProgress] = useState<CipherWorkerProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [fatalError, setFatalError] = useState<Error | null>(null)
-  const activeRequestsRef = useRef(new Map<string, {
-    resolve: (value: CipherResult) => void
-    reject: (reason: any) => void
-    signal?: AbortSignal
-    onAbort?: () => void
-    timeoutId?: ReturnType<typeof setTimeout>
-    cacheKey?: string
-    onProgress?: (percent: number, message: string) => void
-  }>())
+  const activeRequestsRef = useRef<Map<string, RequestHandlers>>(new Map())
 
-  const terminateWorkerAndRejectAll = useCallback((reason: Error) => {
-    workerRef.current?.terminate()
-    workerRef.current = null
-    for (const req of activeRequestsRef.current.values()) {
-      if (req.timeoutId) clearTimeout(req.timeoutId)
-      if (req.signal && req.onAbort) req.signal.removeEventListener('abort', req.onAbort)
-      req.reject(reason)
-    }
-    activeRequestsRef.current.clear()
-    setLoading(false)
-  }, [])
+  useEffect(() => {
+    if (typeof window === 'undefined') return
 
-  const createWorker = useCallback(() => {
-    if (typeof window === 'undefined') return null
-    const worker = new Worker(new URL('../lib/workers/cipher.worker.ts', import.meta.url))
-    worker.onmessage = (event: MessageEvent<WorkerResponse | any>) => {
+    const worker = new Worker(
+      new URL('../lib/workers/cipher.worker.ts', import.meta.url),
+      { type: 'module' },
+    )
+    workerRef.current = worker
+
+    const handleMessage = (event: MessageEvent<WorkerResponse | WorkerProgressMessage>) => {
       const data = event.data
-      if (data?.type === 'PROGRESS') {
-        const p = {
-          percent: Math.max(0, Math.min(100, Number(data.percent))),
-          currentMilestone: String(data.currentMilestone ?? ''),
-          jobId: String(data.jobId ?? ''),
-        }
-        setProgress(p)
-        activeRequestsRef.current.get(p.jobId)?.onProgress?.(p.percent, p.currentMilestone)
+      if (data.type === 'PROGRESS') {
+        setProgress({
+          percent: data.percent,
+          currentMilestone: data.currentMilestone,
+          jobId: data.jobId,
+        })
+        const handler = activeRequestsRef.current.get(data.jobId)
+        handler?.onProgress?.(data.percent, data.currentMilestone)
         return
       }
-      const requestId = data.requestId
-      const request = activeRequestsRef.current.get(requestId)
-      if (!request) return
-      if (request.timeoutId) clearTimeout(request.timeoutId)
-      if (request.signal && request.onAbort) request.signal.removeEventListener('abort', request.onAbort)
-      if (data.success && data.payload?.result) {
-        if (request.cacheKey) cacheResult(request.cacheKey, data.payload.result)
-        request.resolve(data.payload.result)
-      } else {
-        request.reject(new Error(data.payload?.error || 'Unknown worker error'))
-      }
+
+      const { requestId, success, payload, timings } = data
+      const handlers = activeRequestsRef.current.get(requestId)
+      if (!handlers) return
+
+      const { resolve, reject, timeoutId, signal, onAbort, cacheKey } = handlers
+      clearTimeout(timeoutId)
+      if (signal && onAbort) signal.removeEventListener('abort', onAbort)
       activeRequestsRef.current.delete(requestId)
+
       if (activeRequestsRef.current.size === 0) {
         setLoading(false)
         setProgress(null)
       }
-    }
-    worker.onerror = (event) => {
-      const errorObject = new Error(event.message || 'Web Worker initialization or runtime error.')
-      setError(errorObject.message)
-      setFatalError(errorObject)
-      terminateWorkerAndRejectAll(errorObject)
-    }
-    return worker
-  }, [terminateWorkerAndRejectAll])
 
-  useEffect(() => {
-    workerRef.current = createWorker()
-    return () => workerRef.current?.terminate()
-  }, [createWorker])
+      if (success && payload?.result) {
+        const result: CipherResult = {
+          ...payload.result,
+          durationMs: timings?.durationMs ?? payload.result.durationMs ?? 0,
+        }
+        if (cacheKey) cacheResult(cacheKey, result)
+        resolve(result)
+      } else {
+        const errorMsg = payload?.error ?? 'Operation failed in worker'
+        const code = payload?.errorCode
+        const cipherErr = code ? new CipherError(code, errorMsg) : new Error(errorMsg)
+        setError(errorMsg)
+        reject(cipherErr)
+      }
+    }
 
-  const runCipher = useCallback((
-    action: 'encrypt' | 'decrypt',
-    cipherId: string,
-    input: string,
-    key: string,
-    options?: RunCipherOptions,
-  ): Promise<CipherResult> => {
-    const cacheKey = getCacheKey(action, cipherId, input, key, options)
-    if (!options?.bypassCache && resultCache.has(cacheKey)) return Promise.resolve(resultCache.get(cacheKey)!)
-    return new Promise((resolve, reject) => {
-      if (!workerRef.current) {
-        workerRef.current = createWorker()
-        if (!workerRef.current) return reject(new Error('Web Worker is not available on SSR.'))
+    const handleError = (event: ErrorEvent) => {
+      const fatal = new Error(`Worker initialization error: ${event.message}`)
+      setFatalError(fatal)
+      setLoading(false)
+      setProgress(null)
+      for (const [, handlers] of activeRequestsRef.current) {
+        clearTimeout(handlers.timeoutId)
+        handlers.reject(fatal)
       }
-      const id = crypto.randomUUID()
-      const signal = options?.signal
-      if (signal?.aborted) return reject(new DOMException('The user aborted the request.', 'AbortError'))
-      let onAbort: (() => void) | undefined
-      onAbort = () => {
-        clearTimeout(timeoutId)
-        workerRef.current?.postMessage({ type: 'CANCEL', requestId: id, jobId: id })
-        activeRequestsRef.current.delete(id)
-        setLoading(activeRequestsRef.current.size > 0)
-        reject(new DOMException('The user aborted the request.', 'AbortError'))
+      activeRequestsRef.current.clear()
+    }
+
+    worker.addEventListener('message', handleMessage)
+    worker.addEventListener('error', handleError)
+
+    return () => {
+      worker.removeEventListener('message', handleMessage)
+      worker.removeEventListener('error', handleError)
+      worker.terminate()
+      workerRef.current = null
+      for (const [, handlers] of activeRequestsRef.current) {
+        clearTimeout(handlers.timeoutId)
+        handlers.reject(new DOMException('The worker was terminated.', 'AbortError'))
       }
-      if (signal) signal.addEventListener('abort', onAbort, { once: true })
-      const timeoutId = setTimeout(() => {
-        setError('WORKER_TIMEOUT')
-        terminateWorkerAndRejectAll(new Error('WORKER_TIMEOUT'))
-      }, 30000)
-      activeRequestsRef.current.set(id, {
-        resolve, reject, signal, onAbort, timeoutId, cacheKey, onProgress: options?.onProgress,
+      activeRequestsRef.current.clear()
+    }
+  }, [])
+
+  const runCipher = useCallback(
+    async (
+      action: 'encrypt' | 'decrypt',
+      cipherId: string,
+      input: string,
+      key: string,
+      options?: RunCipherOptions,
+    ): Promise<CipherResult> => {
+      const cacheKey = options?.bypassCache ? null : getCacheKey(action, cipherId, input, key, options)
+      if (cacheKey && resultCache.has(cacheKey)) {
+        return resultCache.get(cacheKey)!
+      }
+
+      if (fatalError) throw fatalError
+      if (!workerRef.current) throw new Error('Worker is not available in SSR context.')
+
+      return new Promise<CipherResult>((resolve, reject) => {
+        const id = crypto.randomUUID()
+        const signal = options?.signal
+
+        const onAbort = () => {
+          if (workerRef.current) {
+            workerRef.current.postMessage({ type: 'CANCEL', jobId: id })
+          }
+          const handlers = activeRequestsRef.current.get(id)
+          if (handlers) {
+            clearTimeout(handlers.timeoutId)
+            activeRequestsRef.current.delete(id)
+          }
+          if (activeRequestsRef.current.size === 0) {
+            setLoading(false)
+            setProgress(null)
+          }
+          reject(new DOMException('The user aborted the request.', 'AbortError'))
+        }
+
+        if (signal?.aborted) {
+          onAbort()
+          return
+        }
+
+        if (signal) {
+          signal.addEventListener('abort', onAbort, { once: true })
+        }
+
+        const timeoutId = setTimeout(() => {
+          activeRequestsRef.current.delete(id)
+          if (activeRequestsRef.current.size === 0) {
+            setLoading(false)
+            setProgress(null)
+          }
+          reject(new CipherError('WORKER_TIMEOUT', `Cipher operation timed out after ${WORKER_TIMEOUT_MS}ms`))
+        }, WORKER_TIMEOUT_MS)
+
+        activeRequestsRef.current.set(id, {
+          resolve,
+          reject,
+          signal,
+          onAbort,
+          timeoutId,
+          cacheKey,
+          onProgress: options?.onProgress,
+        })
+        setLoading(true)
+        setError(null)
+        setProgress({ percent: 0, currentMilestone: 'Queued', jobId: id })
+
+        const { signal: _sig, priority: _prio, onProgress: _prog, bypassCache: _bpc, ...forwardOptions } = options || {}
+        const requestMessage: WorkerRequest = {
+          type: action,
+          requestId: id,
+          jobId: id,
+          priority: options?.priority ?? 'NORMAL',
+          payload: { cipherId, input, key, options: forwardOptions },
+        }
+
+        try {
+          const payloadBuffer = new TextEncoder().encode(JSON.stringify(requestMessage))
+          workerRef.current!.postMessage(payloadBuffer, [payloadBuffer.buffer])
+        } catch (err) {
+          clearTimeout(timeoutId)
+          activeRequestsRef.current.delete(id)
+          reject(err instanceof Error ? err : new Error(String(err)))
+        }
       })
-      setLoading(true)
-      setError(null)
-      setProgress({ percent: 0, currentMilestone: 'Queued', jobId: id })
-      const requestMessage: WorkerRequest = {
-        type: action,
-        requestId: id,
-        jobId: id,
-        priority: options?.priority ?? 'NORMAL',
-        payload: { cipherId, input, key, options: { ...(options as any), signal: undefined, priority: undefined, onProgress: undefined } },
-      }
-      try {
-        const payloadBuffer = new TextEncoder().encode(JSON.stringify(requestMessage))
-        workerRef.current.postMessage(payloadBuffer, [payloadBuffer.buffer])
-      } catch (err) {
-        clearTimeout(timeoutId)
-        activeRequestsRef.current.delete(id)
-        reject(err instanceof Error ? err : new Error(String(err)))
-      }
-    })
-  }, [createWorker, terminateWorkerAndRejectAll])
+    },
+    [fatalError]
+  )
 
-  if (fatalError) throw fatalError
   return { runCipher, loading, error, progress }
 }

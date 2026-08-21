@@ -205,7 +205,7 @@ export function useSandboxState({ cipher }: UseSandboxStateProps): UseSandboxSta
     setError(null);
     try {
       // Gather options
-      const options: any = {
+      const options: Record<string, unknown> & { instrument?: boolean; signal?: AbortSignal } = {
         instrument: true, // Always request instrumented steps for visualizer
         signal: controller.signal,
       };
@@ -266,11 +266,12 @@ export function useSandboxState({ cipher }: UseSandboxStateProps): UseSandboxSta
           );
         }
       }
-    } catch (err: any) {
-      if (err.name === "AbortError") {
+    } catch (err: unknown) {
+      if ((err instanceof DOMException || err instanceof Error) && err.name === "AbortError") {
         return;
       }
-      setError(err.message || "An error occurred during calculation.");
+      const message = err instanceof Error ? err.message : String(err);
+      setError(message || "An error occurred during calculation.");
       setResult(null);
     } finally {
       if (abortControllerRef.current === controller) {

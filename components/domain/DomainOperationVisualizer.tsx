@@ -94,8 +94,8 @@ export default function DomainOperationVisualizer() {
         }
       );
       setCurrentResult(res);
-    } catch (err: any) {
-      setErrorMsg(err.message || 'Operation failed');
+    } catch (err: unknown) {
+      setErrorMsg(err instanceof Error ? err.message : 'Operation failed');
     } finally {
       setLoading(false);
     }
@@ -183,7 +183,7 @@ export default function DomainOperationVisualizer() {
           <label className="block text-xs text-zinc-400 mb-1 font-medium">User Role (Authorization)</label>
           <select
             value={userRole}
-            onChange={(e) => setUserRole(e.target.value as any)}
+            onChange={(e) => setUserRole(e.target.value as "admin" | "operator" | "user" | "guest")}
             className="w-full bg-zinc-950 border border-zinc-700 rounded-md px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-teal-500"
           >
             <option value="admin">Admin (Full Rights)</option>
@@ -207,7 +207,7 @@ export default function DomainOperationVisualizer() {
           <label className="block text-xs text-zinc-400 mb-1 font-medium">Simulate Terminal Failure State</label>
           <select
             value={simulateFailure}
-            onChange={(e) => setSimulateFailure(e.target.value as any)}
+            onChange={(e) => setSimulateFailure(e.target.value as "NONE" | "REJECTED" | "FAILED" | "EXPIRED" | "CANCELLED")}
             className="w-full bg-zinc-950 border border-zinc-700 rounded-md px-3 py-1.5 text-xs text-white focus:ring-1 focus:ring-teal-500"
           >
             <option value="NONE">None (Happy Path)</option>

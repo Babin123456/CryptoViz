@@ -76,13 +76,13 @@ describe("Worker Communication Suite", () => {
     // Verify the response
     expect(postMessageSpy).toHaveBeenCalled();
     const response = postMessageSpy.mock.calls
-      .map((c) => c[0])
+      .map((c) => c[0] as { requestId?: string; success?: boolean; payload?: { errorCode?: string; error?: string } })
       .find((msg) => msg?.requestId === "req-unknown");
 
     expect(response).toBeDefined();
-    expect(response.success).toBe(false);
-    expect(response.payload.errorCode).toBe("ALGORITHM_UNSUPPORTED");
-    expect(response.payload.error).toContain("fake-cipher-123");
+    expect(response?.success).toBe(false);
+    expect(response?.payload?.errorCode).toBe("ALGORITHM_UNSUPPORTED");
+    expect(response?.payload?.error).toContain("fake-cipher-123");
   });
 
   describe("Dynamic Cipher Module Lazy-Loading", () => {

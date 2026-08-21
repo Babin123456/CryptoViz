@@ -265,8 +265,8 @@ export default function CipherPipelineBuilder() {
       setStages(importedStages);
       setShowImportModal(false);
       setImportJsonInput("");
-    } catch (err: any) {
-      setImportError(err.message || "Invalid JSON format");
+    } catch (err: unknown) {
+      setImportError(err instanceof Error ? err.message : "Invalid JSON format");
     }
   };
 

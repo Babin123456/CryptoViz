@@ -710,7 +710,7 @@ export default function CipherLayout({
       
       // Try to generate diagnostic for the error
       if (err && typeof err === 'object' && 'code' in err) {
-        const diagnosticResult = diagnoseError(err as any, {
+        const diagnosticResult = diagnoseError(err, {
           cipherId: cipher.id,
           fieldName: 'key',
           fieldValue: key,

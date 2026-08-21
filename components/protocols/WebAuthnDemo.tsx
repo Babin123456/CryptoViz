@@ -420,9 +420,10 @@ export default function WebAuthnDemo() {
 
       setRealVerificationStatus('Credential registered successfully!')
       addLog('success', `✔ Real Device Registration Successful! Passkey saved on device. ID: ${rawId.substring(0, 12)}...`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       setRealVerificationStatus('Error occurred during registration.')
-      addLog('error', `Real Device Error: ${err.message || err.toString()}`)
+      const msg = err instanceof Error ? err.message : String(err)
+      addLog('error', `Real Device Error: ${msg}`)
       console.error(err)
     }
   }
@@ -490,9 +491,10 @@ export default function WebAuthnDemo() {
 
       setRealVerificationStatus('Authentication successful!')
       addLog('success', `✔ Real Device Authentication Successful! Welcome, ${activeCred.username}!`)
-    } catch (err: any) {
+    } catch (err: unknown) {
       setRealVerificationStatus('Error occurred during authentication.')
-      addLog('error', `Real Device Error: ${err.message || err.toString()}`)
+      const msg = err instanceof Error ? err.message : String(err)
+      addLog('error', `Real Device Error: ${msg}`)
       console.error(err)
     }
   }

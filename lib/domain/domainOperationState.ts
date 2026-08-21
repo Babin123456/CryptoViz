@@ -47,7 +47,7 @@ export interface AuthContext {
 export interface DomainOperationInput {
   category: DomainOperationCategory;
   operationName: string;
-  payload: Record<string, any>;
+  payload: Record<string, unknown>;
   idempotencyKey: string;
   isSimulation?: boolean;
 }
