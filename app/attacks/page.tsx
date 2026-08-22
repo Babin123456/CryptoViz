@@ -22,6 +22,16 @@ export interface AttackDemoItem {
 
 export const ATTACK_COLLECTION: AttackDemoItem[] = [
   {
+    id: 'aead-nonce-reuse',
+    slug: 'aead-nonce-reuse',
+    title: 'AEAD Nonce-Reuse Catastrophe',
+    category: 'Cryptanalysis',
+    riskLevel: 'Critical',
+    summary: 'Reusing one AES-GCM nonce lets an attacker solve for the GHASH key in GF(2¹²⁸) and forge a tag the real verifier accepts.',
+    educationalNote: 'The "forbidden attack" (Joux): the tag pad E_K(J0) depends only on the nonce, so two messages under one nonce cancel it, leaving ΔT = ΔC·H² — a unique GF(2¹²⁸) square root recovers H, then any message can be forged. Never reuse a GCM nonce; AES-GCM-SIV (RFC 8452) survives reuse.',
+    tags: ['AES-GCM', 'GHASH', 'GF(2¹²⁸)', 'Nonce Reuse', 'Forgery', 'AEAD'],
+  },
+  {
     id: 'signature-nonce-reuse',
     slug: 'signature-nonce-reuse',
     title: 'Signature Nonce-Reuse & Malleability',
