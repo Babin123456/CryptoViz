@@ -54,6 +54,7 @@ export const PRECACHE_ROUTES: string[] = [
   "/docs/tls13-handshake/",
   "/docs/visualization-development-guide/",
   "/docs/worker-architecture/",
+  "/drbg-visualizer/",
   "/ecc-playground/",
   "/emv/",
   "/encoding-errors/",
