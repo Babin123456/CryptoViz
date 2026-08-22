@@ -60,6 +60,7 @@ export const PRECACHE_ROUTES: string[] = [
   "/encoding/",
   "/entropy-harvesting/",
   "/finite-field/",
+  "/fpe-playground/",
   "/globals.css",
   "/glossary/",
   "/homomorphic/",
