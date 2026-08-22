@@ -840,6 +840,17 @@ export const CIPHER_REGISTRY: CipherDefinition[] = [
     keySize: '128/192/256',
   },
   {
+    id: 'twine',
+    name: 'TWINE',
+    category: 'symmetric',
+    description: 'Ultra-compact Type-2 Generalised Feistel cipher (NTT Japan, 2013). 64-bit block, 36 rounds, 4-bit S-box, nibble permutation diffusion. Targets hardware < 2000 GE.',
+    defaultKey: '00112233445566778899',
+    defaultInput: '0011223344556677',
+    securityStatus: 'legacy',
+    keyPlaceholder: '20 or 32 hex characters (80 or 128-bit key)',
+    options: [{ name: 'Key Size', id: 'keySize', type: 'select', default: '80', choices: [{ label: 'TWINE-80 (80-bit key)', value: '80' }, { label: 'TWINE-128 (128-bit key)', value: '128' }] }]
+  },
+  {
     id: 'cast128',
     name: 'CAST-128 (CAST5)',
     category: 'symmetric',
@@ -849,6 +860,17 @@ export const CIPHER_REGISTRY: CipherDefinition[] = [
     securityStatus: 'legacy',
     keyPlaceholder: '10–32 hex characters (5–16 bytes)',
     options: [{ name: 'Mode', id: 'mode', type: 'select', default: 'cbc', choices: [{ label: 'CBC', value: 'cbc' }, { label: 'ECB', value: 'ecb' }] }]
+  },
+  {
+    id: 'skinny',
+    name: 'SKINNY-128',
+    category: 'symmetric',
+    description: 'Tweakable block cipher (EUROCRYPT 2016). TWEAKEY framework: key and tweak treated uniformly through parallel sub-tweakey arrays with LFSR feedback. Core primitive of ROMULUS (NIST LWC Standard).',
+    defaultKey: '00'.repeat(32),
+    defaultInput: '000102030405060708090a0b0c0d0e0f',
+    securityStatus: 'secure',
+    keyPlaceholder: '32/64/96 hex chars (128/256/384-bit tweakey)',
+    options: [{ name: 'Parameter Set', id: 'paramSet', type: 'select', default: '128-256', choices: [{ label: 'SKINNY-128-128 (40 rounds)', value: '128-128' }, { label: 'SKINNY-128-256 (48 rounds)', value: '128-256' }, { label: 'SKINNY-128-384 (56 rounds)', value: '128-384' }] }]
   },
   {
     id: "sha256",
@@ -862,6 +884,19 @@ export const CIPHER_REGISTRY: CipherDefinition[] = [
     keySize: "None (hash function)",
     practicalUseCases: ["Data integrity verification", "Digital signatures", "Blockchain proof-of-work", "Password hashing (via HMAC/PBKDF2)"],
     recommendedNext: ["hmac", "sha512", "bcrypt"],
+  },
+  {
+    id: 'cubehash',
+    name: 'CubeHash',
+    category: 'hash',
+    description: 'SHA-3 finalist (Daniel Bernstein). Configurable r/b/h hypercube sponge. 128-byte state, 10 mixing steps per round (only additions, rotations, XOR, swaps — no S-boxes).',
+    defaultKey: '',
+    defaultInput: '',
+    securityStatus: 'experimental',
+    options: [
+      { name: 'Output Bits', id: 'outputBits', type: 'select', default: 256, choices: [{ label: '256-bit', value: 256 }, { label: '512-bit', value: 512 }] },
+      { name: 'Rounds per Block (r)', id: 'rounds', type: 'number', default: 16 }
+    ]
   },
   {
     id: "sha512",
@@ -894,6 +929,16 @@ export const CIPHER_REGISTRY: CipherDefinition[] = [
     defaultKey: "",
     defaultInput: "abc",
     securityStatus: "broken",
+  },
+  {
+    id: 'luffa',
+    name: 'Luffa',
+    category: 'hash',
+    description: 'SHA-3 finalist (NEC Europe). Multi-channel message queue sponge: 3–5 parallel 256-bit chains, Q permutation (SubCrumb + MixWord). Staggered message injection.',
+    defaultKey: '',
+    defaultInput: '',
+    securityStatus: 'experimental',
+    options: [{ name: 'Output Bits', id: 'outputBits', type: 'select', default: 256, choices: [{ label: '256-bit', value: 256 }, { label: '384-bit', value: 384 }, { label: '512-bit', value: 512 }] }]
   },
   {
     id: "hmac",
@@ -1719,5 +1764,26 @@ export const CIPHER_REGISTRY: CipherDefinition[] = [
     defaultInput: '48656c6c6f',
     securityStatus: 'recommended',
     options: [{ name: 'Leaf Index', id: 'leafIndex', type: 'number', default: 0 }]
+  },
+  {
+    id: 'lamport',
+    name: 'Lamport OTS',
+    category: 'asymmetric',
+    description: 'Lamport One-Time Signature (1979). Hash-based: sign each bit of the message hash by revealing one of two pre-hashed secrets. ⚠ One-time use only. Foundational building block of XMSS.',
+    defaultKey: '00'.repeat(32),
+    defaultInput: '48656c6c6f',
+    securityStatus: 'secure',
+    keyPlaceholder: '64 hex characters (32-byte seed)',
+  },
+  {
+    id: 'wots',
+    name: 'Winternitz OTS',
+    category: 'asymmetric',
+    description: 'Winternitz One-Time Signature. Extends Lamport OTS using SHA-256 hash chains of length 2^w − 1. Predecessor of WOTS+ (XMSS) and LM-OTS (LMS). ⚠ One-time use only.',
+    defaultKey: '00'.repeat(32),
+    defaultInput: '48656c6c6f',
+    securityStatus: 'secure',
+    keyPlaceholder: '64 hex characters (32-byte seed)',
+    options: [{ name: 'Winternitz Parameter (w)', id: 'w', type: 'select', default: 4, choices: [{ label: 'w=2', value: 2 }, { label: 'w=4', value: 4 }, { label: 'w=8', value: 8 }] }]
   },
 ];
