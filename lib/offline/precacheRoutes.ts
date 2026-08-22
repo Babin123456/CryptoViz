@@ -110,6 +110,7 @@ export const PRECACHE_ROUTES: string[] = [
   "/security-games/",
   "/security-recommendation/",
   "/signal-lab/",
+  "/srp-lab/",
   "/steganography/",
   "/test-vectors/",
   "/tests/integration/",
