@@ -94,6 +94,7 @@ export const PRECACHE_ROUTES: string[] = [
   "/protocols/zero-knowledge/",
   "/quality/reliability/",
   "/quantum-cryptanalysis/",
+  "/quantum-key-distribution/",
   "/rainbow-table/",
   "/reference/",
   "/resources/",
