@@ -45,8 +45,8 @@ export const PRODUCTION_CSP_DIRECTIVES: CspDirectives = {
   'connect-src': [
     "'self'",
     'https://api.github.com',
-    'https://*.vercel-insights.com',
-    'https://*.supabase.co',
+    'https://vercel-insights.com',
+    'https://supabase.co',
   ],
   'worker-src': ["'self'", 'blob:'],
   'frame-src': ["'self'", 'https://www.youtube-nocookie.com'],
