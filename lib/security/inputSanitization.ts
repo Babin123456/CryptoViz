@@ -68,6 +68,8 @@ export function sanitizeCryptoInput(value: unknown, options: SanitizationOptions
 
   if (options.escapeHtml === true) {
     sanitized = escapeHtml(sanitized);
+    // Neutralize inline event handler attributes (e.g., onerror=, onload=) in unquoted attribute contexts
+    sanitized = sanitized.replace(/on\w+\s*=/gi, "data-sanitized-event=");
   }
 
   const warnings: string[] = [];
